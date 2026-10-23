@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <!-- 모바일 줌 방지 및 모바일 뷰포트 최적화 (viewport-fit=cover 포함) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <!-- 모바일 PWA & 웹앱 홈화면 추가 관련 설정 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#E6E6FA">
+  <title>MiMi Planner</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Gaegu (손글씨) & Patrick Hand & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Patrick+Hand&family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    /* 스마트폰 전용 세이프 에어리어 & 웹킷 터치 하이라이트 제거 */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* input 텍스트 입력 시에는 드래그/선택 가능 */
+    input, textarea {
+      user-select: text;
+      /* iOS Safari에서 input 포커스 시 자동 확대(Zoom)를 방지하기 위해 최소 16px 지정 */
+      font-size: 16px !important; 
+    }
+
+    body {
+      font-family: 'Gaegu', 'Patrick Hand', 'Noto Sans KR', cursive, sans-serif;
+      background-color: #E6E6FA;
+      background-image: 
+        radial-gradient(#DCD0FF 2px, transparent 2px),
+        radial-gradient(#DCD0FF 2px, #E6E6FA 2px);
+      background-size: 28px 28px;
+      background-position: 0 0, 14px 14px;
+      color: #4A3B6B;
+      /* 모바일 상/하단 세이프 에어리어 적용 */
+      padding-top: max(12px, env(safe-area-inset-top));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: none;
+    }
+
+    .font-hand {
+      font-family: 'Gaegu', 'Patrick Hand', cursive, sans-serif;
+    }
+
+    /* 모눈종이 패턴 */
+    .bg-grid-paper {
+      background-color: #ffffff;
+      background-image: 
+        linear-gradient(to right, rgba(200, 180, 240, 0.25) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(200, 180, 240, 0.25) 1px, transparent 1px);
+      background-size: 18px 18px;
+    }
+
+    /* 줄노트 패턴 */
+    .bg-lined-paper {
+      background-color: #ffffff;
+      background-image: linear-gradient(transparent 93%, rgba(210, 190, 250, 0.35) 93%);
+      background-size: 100% 28px;
+    }
+
+    /* 바인더 스프링 구멍 */
+    .binder-holes {
+      position: absolute;
+      left: 10px;
+      top: 15px;
+      bottom: 15px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      z-index: 10;
+    }
+    .binder-hole {
+      width: 14px;
+      height: 14px;
+      background-color: #BDB2FF;
+      border-radius: 50%;
+      box-shadow: inset 1.5px 1.5px 3px rgba(0, 0, 0, 0.25);
+    }
+
+    /* 다꾸 마스킹 테이프 */
+    .tape-purple-left {
+      position: absolute;
+      top: -10px;
+      left: 14px;
+      width: 55px;
+      height: 22px;
+      background-color: rgba(216, 180, 254, 0.85);
+      transform: rotate(-22deg);
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+      z-index: 20;
+    }
+    .tape-purple-right {
+      position: absolute;
+      top: -10px;
+      right: 14px;
+      width: 55px;
+      height: 22px;
+      background-color: rgba(216, 180, 254, 0.85);
+      transform: rotate(22deg);
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+      z-index: 20;
+    }
+    .tape-lavender {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 24px;
+      background-color: #D8B4FE;
+      opacity: 0.9;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      z-index: 20;
+    }
+
+    /* 점선 스티치 테두리 카드 */
+    .dashed-border-purple {
+      border: 3px dashed #C084FC;
+    }
+
+    /* 북마크 리본 태그 */
+    .bookmark-tag {
+      position: absolute;
+      top: 0;
+      width: 18px;
+      height: 36px;
+      background-color: #A855F7;
+      z-index: 20;
+      border-bottom-left-radius: 4px;
+      border-bottom-right-radius: 4px;
+    }
+    .bookmark-tag.left { left: 16px; }
+    .bookmark-tag.right { right: 16px; }
+
+    /* 종이 클립 */
+    .paper-clip {
+      position: absolute;
+      top: -14px;
+      color: #9333EA;
+      font-size: 24px;
+      transform: rotate(15deg);
+      z-index: 20;
+      filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.15));
+    }
+
+    /* 노란 별 스티커 */
+    .star-sticker {
+      color: #FACC15;
+      filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.15));
+    }
+
+    /* 커스텀 스크롤바 (터치 스크롤 포함) */
+    .custom-scroll {
+      -webkit-overflow-scrolling: touch;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(192, 132, 252, 0.5);
+      border-radius: 10px;
+    }
+
+    /* 토스트 알림 애니메이션 */
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-anim {
+      animation: slideUp 0.3s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start text-slate-800">
+
+  <!-- ========================================== -->
+  <!-- 헤더 & 세로형 우측 상단 데이터 관리 버튼 -->
+  <!-- ========================================== -->
+  <header class="relative text-center mb-4 w-full max-w-5xl pr-28 sm:pr-32 pt-2">
+    <!-- 메인 타이틀 -->
+    <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold text-purple-900 tracking-wider drop-shadow-sm flex items-center justify-center gap-1">
+      <span>💜 MiMi Planner 💜</span>
+    </h1>
+    <p class="text-purple-700 mt-1 text-base sm:text-xl font-hand">나만의 보랏빛 다이어리 & To-Do List</p>
+
+    <!-- [우측 상단] 스마트폰 터치에 최적화된 아담한 세로 버튼 스택 (Save / Export / Import) -->
+    <div class="absolute top-1 right-0 flex flex-col items-end gap-1.5 z-30">
+      <!-- 수동 저장 버튼 -->
+      <button onclick="manualSaveData()" title="스마트폰 수동 저장" class="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold py-1 px-2.5 rounded-xl shadow-md border border-purple-400 text-xs sm:text-sm transition-transform active:scale-90 flex items-center gap-1.5 w-24 sm:w-28 justify-center min-h-[36px]">
+        <i class="fa-solid fa-floppy-disk text-amber-300"></i>
+        <span>💾 저장</span>
+      </button>
+
+      <!-- 다운로드 (백업) 버튼 -->
+      <button onclick="exportDataJSON()" title="JSON 파일 내보내기" class="bg-white/95 hover:bg-purple-100 active:bg-purple-200 text-purple-900 font-bold py-1 px-2.5 rounded-xl shadow-md border border-purple-300 text-xs sm:text-sm transition-transform active:scale-90 flex items-center gap-1.5 w-24 sm:w-28 justify-center min-h-[36px]">
+        <i class="fa-solid fa-file-arrow-down text-purple-600"></i>
+        <span>📥 내보내기</span>
+      </button>
+
+      <!-- 업로드 (복원) 버튼 -->
+      <label title="JSON 파일 불러오기" class="bg-white/95 hover:bg-purple-100 active:bg-purple-200 text-purple-900 font-bold py-1 px-2.5 rounded-xl shadow-md border border-purple-300 text-xs sm:text-sm transition-transform active:scale-90 flex items-center gap-1.5 w-24 sm:w-28 justify-center min-h-[36px] cursor-pointer">
+        <i class="fa-solid fa-file-arrow-up text-purple-600"></i>
+        <span>📤 불러오기</span>
+        <input type="file" id="import-file-input" accept=".json" onchange="importDataJSON(event)" class="hidden">
+      </label>
+    </div>
+
+    <!-- 뷰 전환 탭 메뉴 (주간 / 월간 / 연간) -->
+    <nav class="flex justify-center gap-1.5 sm:gap-2 mt-4">
+      <button id="tab-weekly" onclick="switchView('weekly')" class="px-3.5 sm:px-5 py-1.5 text-base sm:text-xl font-bold rounded-full transition-all shadow-md bg-purple-600 text-white min-h-[40px] flex items-center justify-center">
+        <i class="fa-solid fa-calendar-week mr-1"></i> 주간 (Weekly)
+      </button>
+      <button id="tab-monthly" onclick="switchView('monthly')" class="px-3.5 sm:px-5 py-1.5 text-base sm:text-xl font-bold rounded-full transition-all shadow-md bg-white/80 text-purple-800 hover:bg-white min-h-[40px] flex items-center justify-center">
+        <i class="fa-solid fa-calendar-days mr-1"></i> 월간 (Monthly)
+      </button>
+      <button id="tab-yearly" onclick="switchView('yearly')" class="px-3.5 sm:px-5 py-1.5 text-base sm:text-xl font-bold rounded-full transition-all shadow-md bg-white/80 text-purple-800 hover:bg-white min-h-[40px] flex items-center justify-center">
+        <i class="fa-solid fa-calendar mr-1"></i> 연간 (Yearly)
+      </button>
+    </nav>
+  </header>
+
+  <!-- 메인 콘텐츠 영역 -->
+  <main class="w-full max-w-6xl px-1">
+
+    <!-- ========================================== -->
+    <!-- 1. 주간 뷰 (WEEKLY VIEW - 7 Days + ToDo) -->
+    <!-- ========================================== -->
+    <div id="view-weekly" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <!-- 월요일 -->
+      <div class="relative bg-grid-paper rounded-2xl p-4 pt-6 pl-9 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="tape-purple-left"></div>
+        <div class="tape-purple-right"></div>
+        <div class="binder-holes">
+          <div class="binder-hole"></div><div class="binder-hole"></div><div class="binder-hole"></div><div class="binder-hole"></div>
+        </div>
+        <h2 class="text-2xl font-bold text-center text-purple-900 mb-2 border-b-2 border-purple-200 pb-1 font-hand">Monday</h2>
+        <ul id="list-monday" class="space-y-1 flex-grow overflow-y-auto max-h-[160px] custom-scroll pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-100 pt-2">
+          <input type="text" id="input-monday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('monday')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 화요일 -->
+      <div class="relative bg-white rounded-2xl p-4 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="absolute inset-3 dashed-border-purple rounded-xl pointer-events-none"></div>
+        <i class="fa-solid fa-star star-sticker absolute -top-3 -right-1 text-3xl transform rotate-12"></i>
+        <i class="fa-solid fa-star star-sticker absolute -bottom-2 -left-2 text-3xl transform -rotate-12"></i>
+        <h2 class="text-2xl font-bold text-center text-purple-900 mb-2 z-10 font-hand">Tuesday</h2>
+        <ul id="list-tuesday" class="space-y-1 flex-grow overflow-y-auto max-h-[160px] custom-scroll z-10 pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-dashed border-purple-300 pt-2 z-10">
+          <input type="text" id="input-tuesday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('tuesday')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 수요일 -->
+      <div class="relative bg-grid-paper rounded-2xl p-4 pt-6 pl-9 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="binder-holes">
+          <div class="binder-hole"></div><div class="binder-hole"></div><div class="binder-hole"></div><div class="binder-hole"></div>
+        </div>
+        <div class="absolute bottom-2 right-3 star-sticker text-2xl opacity-90 pointer-events-none">
+          <i class="fa-solid fa-moon text-amber-300"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-center text-purple-900 mb-2 border-b-2 border-purple-200 pb-1 font-hand">Wednesday</h2>
+        <ul id="list-wednesday" class="space-y-1 flex-grow overflow-y-auto max-h-[160px] custom-scroll pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-100 pt-2">
+          <input type="text" id="input-wednesday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('wednesday')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 목요일 -->
+      <div class="relative bg-lined-paper rounded-2xl p-4 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="tape-lavender"></div>
+        <div class="bg-purple-200/80 rounded-xl pt-2 pb-1 px-4 mb-2 text-center shadow-sm">
+          <h2 class="text-2xl font-bold text-purple-900 font-hand">Thursday</h2>
+        </div>
+        <ul id="list-thursday" class="space-y-1 flex-grow overflow-y-auto max-h-[150px] custom-scroll pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-200 pt-2">
+          <input type="text" id="input-thursday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-400 font-hand px-1 h-10">
+          <button onclick="addTask('thursday')" class="text-purple-700 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 금요일 -->
+      <div class="relative bg-grid-paper rounded-2xl p-4 pt-6 pl-9 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <i class="fa-solid fa-paperclip paper-clip left-6"></i>
+        <i class="fa-solid fa-paperclip paper-clip right-6"></i>
+        <div class="binder-holes">
+          <div class="binder-hole"></div><div class="binder-hole"></div><div class="binder-hole"></div><div class="binder-hole"></div>
+        </div>
+        <div class="bg-purple-100 rounded-lg py-1 px-3 mb-2 text-center">
+          <h2 class="text-2xl font-bold text-purple-900 font-hand">Friday</h2>
+        </div>
+        <ul id="list-friday" class="space-y-1 flex-grow overflow-y-auto max-h-[150px] custom-scroll pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-100 pt-2">
+          <input type="text" id="input-friday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('friday')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 토요일 -->
+      <div class="relative bg-white rounded-2xl p-4 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="tape-purple-left"></div>
+        <i class="fa-solid fa-heart star-sticker absolute top-3 right-4 text-2xl text-pink-400"></i>
+        <h2 class="text-2xl font-bold text-center text-indigo-800 mb-2 border-b border-indigo-100 pb-1 font-hand">Saturday 🎈</h2>
+        <ul id="list-saturday" class="space-y-1 flex-grow overflow-y-auto max-h-[160px] custom-scroll pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-100 pt-2">
+          <input type="text" id="input-saturday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('saturday')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- 일요일 -->
+      <div class="relative bg-lined-paper rounded-2xl p-4 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="bookmark-tag left"></div>
+        <h2 class="text-2xl font-bold text-center text-rose-700 mb-2 border-b border-rose-100 pb-1 font-hand">Sunday ☀️</h2>
+        <ul id="list-sunday" class="space-y-1 flex-grow overflow-y-auto max-h-[160px] custom-scroll pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-100 pt-2">
+          <input type="text" id="input-sunday" placeholder="+ 할 일 추가" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('sunday')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+      <!-- To-Do (메모/목표) -->
+      <div class="relative bg-white rounded-2xl p-4 shadow-lg min-h-[280px] flex flex-col transition-transform active:scale-[0.99] border border-purple-100">
+        <div class="bookmark-tag right"></div>
+        <div class="absolute inset-3 dashed-border-purple rounded-xl pointer-events-none"></div>
+        <h2 class="text-2xl font-bold text-center text-purple-900 mb-2 pt-1 border-b border-purple-100 pb-1 z-10 font-hand">To Do List ✨</h2>
+        <ul id="list-todo" class="space-y-1 flex-grow overflow-y-auto max-h-[160px] custom-scroll z-10 pr-1"></ul>
+        <div class="mt-2 flex items-center border-t border-purple-100 pt-2 z-10">
+          <input type="text" id="input-todo" placeholder="+ 메모 및 기타 목표" class="w-full bg-transparent border-none text-xl focus:outline-none placeholder-purple-300 font-hand px-1 h-10">
+          <button onclick="addTask('todo')" class="text-purple-600 active:text-purple-900 font-bold text-3xl px-2 min-w-[40px] min-h-[40px] flex items-center justify-center">+</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. 월간 뷰 (MONTHLY VIEW) -->
+    <!-- ========================================== -->
+    <div id="view-monthly" class="hidden bg-white/95 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md border-4 border-purple-200">
+      
+      <!-- 월 변경 헤더 -->
+      <div class="flex items-center justify-between mb-4">
+        <button onclick="changeMonth(-1)" class="text-purple-700 active:text-purple-900 bg-purple-100 active:bg-purple-200 rounded-full w-10 h-10 flex items-center justify-center text-xl transition min-w-[40px] min-h-[40px]">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <h2 id="monthly-title" class="text-2xl sm:text-4xl font-bold text-purple-900 font-hand">2026년 10월</h2>
+        <button onclick="changeMonth(1)" class="text-purple-700 active:text-purple-900 bg-purple-100 active:bg-purple-200 rounded-full w-10 h-10 flex items-center justify-center text-xl transition min-w-[40px] min-h-[40px]">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+
+      <!-- 요일 헤더 -->
+      <div class="grid grid-cols-7 text-center font-bold text-base sm:text-xl text-purple-800 mb-2">
+        <div class="text-red-500">일</div>
+        <div>월</div>
+        <div>화</div>
+        <div>수</div>
+        <div>목</div>
+        <div>금</div>
+        <div class="text-blue-500">토</div>
+      </div>
+
+      <!-- 날짜 그리드 -->
+      <div id="monthly-grid" class="grid grid-cols-7 gap-1 sm:gap-2">
+        <!-- JS 동적 생성 -->
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. 연간 뷰 (YEARLY VIEW) -->
+    <!-- ========================================== -->
+    <div id="view-yearly" class="hidden">
+      <!-- 연도 변경 헤더 -->
+      <div class="flex items-center justify-center gap-4 mb-4">
+        <button onclick="changeYear(-1)" class="text-purple-800 bg-white/90 active:bg-white rounded-full w-10 h-10 flex items-center justify-center text-xl transition shadow min-w-[40px] min-h-[40px]">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <h2 id="yearly-title" class="text-2xl sm:text-4xl font-bold text-purple-900 font-hand drop-shadow-sm">2026년 목표 & 버킷리스트</h2>
+        <button onclick="changeYear(1)" class="text-purple-800 bg-white/90 active:bg-white rounded-full w-10 h-10 flex items-center justify-center text-xl transition shadow min-w-[40px] min-h-[40px]">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
+
+      <!-- 12개월 카드 그리드 -->
+      <div id="yearly-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <!-- JS 1월~12월 생성 -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- 모바일 터치 반응성 모달 (월간 뷰) -->
+  <div id="day-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl p-5 w-full max-w-md shadow-2xl border-4 border-purple-300 relative">
+      <button onclick="closeModal()" class="absolute top-3 right-3 text-purple-400 active:text-purple-700 text-2xl font-bold p-2 min-w-[40px] min-h-[40px] flex items-center justify-center">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 id="modal-date-title" class="text-2xl font-bold text-purple-900 mb-3 border-b border-purple-100 pb-2 font-hand">
+        일정 상세
+      </h3>
+      <ul id="modal-task-list" class="space-y-2 max-h-56 overflow-y-auto custom-scroll mb-3 font-hand"></ul>
+      <div class="flex items-center gap-2 border-t border-purple-200 pt-3">
+        <input type="text" id="modal-input" placeholder="+ 새로운 일정" class="flex-grow bg-purple-50 rounded-xl px-3 py-2 text-xl focus:outline-none focus:ring-2 focus:ring-purple-300 font-hand h-11">
+        <button onclick="addModalTask()" class="bg-purple-600 active:bg-purple-800 text-white font-bold px-4 rounded-xl text-lg min-h-[44px] flex items-center justify-center">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 스마트폰 하단 고정 토스트 알림 메시지 -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-purple-900/95 text-white font-bold px-5 py-2.5 rounded-2xl shadow-2xl hidden items-center gap-2 z-50 border-2 border-purple-300 text-base sm:text-lg w-[90%] max-w-sm text-center justify-center">
+    <i class="fa-solid fa-circle-check text-amber-300 text-xl"></i>
+    <span id="toast-msg">저장되었습니다!</span>
+  </div>
+
+  <!-- 푸터 영역 -->
+  <footer class="mt-8 mb-4 text-center text-purple-800 text-xs sm:text-sm">
+    <button onclick="clearAllData()" class="text-purple-600 hover:text-red-500 underline transition p-2">
+      <i class="fa-solid fa-trash-can mr-1"></i> 데이터 전체 초기화
+    </button>
+    <p class="mt-1 text-purple-600/80">💜 MiMi Planner — 스마트폰 영구 로컬 저장 지원</p>
+  </footer>
+
+  <script>
+    // 날짜 및 데이터 상태 관리
+    let currentDate = new Date();
+    let currentView = 'weekly';
+    let selectedModalDateKey = '';
+
+    // 플래너 기본 초기 데이터
+    let appData = {
+      weekly: {
+        monday: [{ id: 1, text: '주간 다이어리 작성 💜', completed: true }],
+        tuesday: [{ id: 2, text: '라벤더 차 한 잔 마시기 🍵', completed: false }],
+        wednesday: [{ id: 3, text: '운동 및 산책 30분 🏃‍♀️', completed: false }],
+        thursday: [{ id: 4, text: '독서 1시간 하기 📚', completed: false }],
+        friday: [{ id: 5, text: '주말 영화 예약 🎬', completed: false }],
+        saturday: [{ id: 6, text: '예쁜 카페 나들이 🍰', completed: false }],
+        sunday: [{ id: 7, text: '다음 주 일정 정리 ✨', completed: false }],
+        todo: [{ id: 8, text: '방 청소 & 정리정돈', completed: false }]
+      },
+      monthly: {},
+      yearly: {}
+    };
+
+    // 로컬 스토리지 데이터 로드
+    function loadData() {
+      const saved = localStorage.getItem('mimi_planner_mobile_v1');
+      if (saved) {
+        try {
+          appData = JSON.parse(saved);
+        } catch (e) {
+          console.error('Data loading error', e);
+        }
+      } else {
+        saveDataSilently();
+      }
+    }
+
+    // 자동 백그라운드 저장
+    function saveDataSilently() {
+      localStorage.setItem('mimi_planner_mobile_v1', JSON.stringify(appData));
+    }
+
+    // [💾 수동 저장 버튼]
+    function manualSaveData() {
+      saveDataSilently();
+      showToast('💾 스마트폰에 수동 저장되었습니다!');
+    }
+
+    // 토스트 메시지 띄우기
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      if (!toast || !toastMsg) return;
+
+      toastMsg.innerText = message;
+      toast.classList.remove('hidden');
+      toast.classList.add('flex', 'toast-anim');
+
+      setTimeout(() => {
+        toast.classList.add('hidden');
+        toast.classList.remove('flex', 'toast-anim');
+      }, 2300);
+    }
+
+    // [📥 내보내기 / JSON 다운로드]
+    function exportDataJSON() {
+      saveDataSilently();
+      const dataStr = JSON.stringify(appData, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const filename = `mimi_planner_backup_${today}.json`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast('📥 백업 파일(.json)이 다운로드되었습니다!');
+    }
+
+    // [📤 불러오기 / JSON 업로드]
+    function importDataJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importedData = JSON.parse(e.target.result);
+
+          if (importedData && (importedData.weekly || importedData.monthly || importedData.yearly)) {
+            if (confirm('기존 데이터를 복원 데이터로 전체 교체하시겠습니까?')) {
+              appData = {
+                weekly: importedData.weekly || {},
+                monthly: importedData.monthly || {},
+                yearly: importedData.yearly || {}
+              };
+
+              saveDataSilently();
+              renderWeekly();
+              if (currentView === 'monthly') renderMonthlyView();
+              if (currentView === 'yearly') renderYearlyView();
+
+              showToast('📤 데이터가 성공적으로 복원되었습니다! 💜');
+            }
+          } else {
+            alert('올바른 MiMi Planner 백업(.json) 파일이 아닙니다.');
+          }
+        } catch (err) {
+          alert('파일을 불러오는 중 오류가 발생했습니다.');
+          console.error(err);
+        }
+        event.target.value = '';
+      };
+
+      reader.readAsText(file);
+    }
+
+    // 탭 전환 (주간 / 월간 / 연간)
+    function switchView(view) {
+      currentView = view;
+      document.getElementById('view-weekly').classList.toggle('hidden', view !== 'weekly');
+      document.getElementById('view-monthly').classList.toggle('hidden', view !== 'monthly');
+      document.getElementById('view-yearly').classList.toggle('hidden', view !== 'yearly');
+
+      ['weekly', 'monthly', 'yearly'].forEach(v => {
+        const btn = document.getElementById(`tab-${v}`);
+        if (v === view) {
+          btn.className = "px-3.5 sm:px-5 py-1.5 text-base sm:text-xl font-bold rounded-full transition-all shadow-md bg-purple-600 text-white min-h-[40px] flex items-center justify-center";
+        } else {
+          btn.className = "px-3.5 sm:px-5 py-1.5 text-base sm:text-xl font-bold rounded-full transition-all shadow-md bg-white/80 text-purple-800 hover:bg-white min-h-[40px] flex items-center justify-center";
+        }
+      });
+
+      if (view === 'monthly') renderMonthlyView();
+      if (view === 'yearly') renderYearlyView();
+    }
+
+    // ==========================================
+    // WEEKLY VIEW LOGIC
+    // ==========================================
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'todo'];
+
+    function renderWeekly() {
+      days.forEach(day => {
+        const ul = document.getElementById(`list-${day}`);
+        if (!ul) return;
+        ul.innerHTML = '';
+
+        const tasks = appData.weekly[day] || [];
+        tasks.forEach(task => {
+          const li = document.createElement('li');
+          li.className = 'flex items-center justify-between group py-1.5 text-xl border-b border-dashed border-purple-200/80 leading-tight font-hand min-h-[38px]';
+          
+          const checkIconClass = task.completed ? 'fa-solid fa-circle-check text-purple-600' : 'fa-regular fa-circle text-purple-300';
+          const textClass = task.completed ? 'line-through text-purple-300' : 'text-slate-800';
+
+          li.innerHTML = `
+            <div class="flex items-center gap-2 cursor-pointer flex-grow min-w-0 pr-1 py-1" onclick="toggleTask('weekly', '${day}', ${task.id})">
+              <i class="${checkIconClass} text-xl min-w-[22px]"></i>
+              <span class="${textClass} truncate select-none">${escapeHtml(task.text)}</span>
+            </div>
+            <button onclick="deleteTask('weekly', '${day}', ${task.id})" class="text-purple-300 active:text-red-500 px-2 py-1 min-w-[36px] flex items-center justify-center">
+              <i class="fa-solid fa-trash-can text-base"></i>
+            </button>
+          `;
+          ul.appendChild(li);
+        });
+      });
+    }
+
+    function addTask(day) {
+      const input = document.getElementById(`input-${day}`);
+      if (!input) return;
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (!appData.weekly[day]) appData.weekly[day] = [];
+      appData.weekly[day].push({ id: Date.now(), text, completed: false });
+
+      saveDataSilently();
+      renderWeekly();
+      input.value = '';
+    }
+
+    // ==========================================
+    // MONTHLY VIEW LOGIC
+    // ==========================================
+    function changeMonth(delta) {
+      currentDate.setMonth(currentDate.getMonth() + delta);
+      renderMonthlyView();
+    }
+
+    function renderMonthlyView() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      document.getElementById('monthly-title').innerText = `${year}년 ${month + 1}월`;
+
+      const grid = document.getElementById('monthly-grid');
+      grid.innerHTML = '';
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const totalDays = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < firstDayIndex; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = "min-h-[55px] sm:min-h-[80px] bg-purple-50/30 rounded-xl";
+        grid.appendChild(emptyCell);
+      }
+
+      for (let day = 1; day <= totalDays; day++) {
+        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayTasks = appData.monthly[dateKey] || [];
+        const completedCount = dayTasks.filter(t => t.completed).length;
+
+        const cell = document.createElement('div');
+        cell.className = "min-h-[55px] sm:min-h-[80px] bg-white border border-purple-100 active:bg-purple-50 rounded-xl p-1 sm:p-2 cursor-pointer transition shadow-sm flex flex-col justify-between";
+        cell.onclick = () => openDayModal(dateKey, year, month + 1, day);
+
+        const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+        const todayBadge = isToday ? 'bg-purple-600 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center font-bold text-xs sm:text-sm' : 'text-purple-900 font-bold text-xs sm:text-base';
+
+        let badgeHtml = '';
+        if (dayTasks.length > 0) {
+          badgeHtml = `<span class="text-[10px] sm:text-xs font-bold text-purple-700 bg-purple-100 px-1 py-0.2 rounded-full inline-block">
+            ${completedCount}/${dayTasks.length}
+          </span>`;
+        }
+
+        cell.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="${todayBadge}">${day}</span>
+            ${badgeHtml}
+          </div>
+          <div class="text-[11px] sm:text-xs text-slate-600 overflow-hidden text-ellipsis whitespace-nowrap font-hand">
+            ${dayTasks.length > 0 ? escapeHtml(dayTasks[0].text) : ''}
+          </div>
+        `;
+        grid.appendChild(cell);
+      }
+    }
+
+    function openDayModal(dateKey, year, month, day) {
+      selectedModalDateKey = dateKey;
+      document.getElementById('modal-date-title').innerText = `🗓️ ${year}년 ${month}월 ${day}일 일정`;
+      document.getElementById('day-modal').classList.remove('hidden');
+      document.getElementById('day-modal').classList.add('flex');
+      renderModalTasks();
+    }
+
+    function closeModal() {
+      document.getElementById('day-modal').classList.add('hidden');
+      document.getElementById('day-modal').classList.remove('flex');
+    }
+
+    function renderModalTasks() {
+      const ul = document.getElementById('modal-task-list');
+      ul.innerHTML = '';
+      const tasks = appData.monthly[selectedModalDateKey] || [];
+
+      if (tasks.length === 0) {
+        ul.innerHTML = '<li class="text-slate-400 text-center py-4">등록된 일정이 없습니다 ✨</li>';
+        return;
+      }
+
+      tasks.forEach(task => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between p-2 rounded-xl bg-purple-50 text-xl font-hand min-h-[40px]';
+        
+        const checkIconClass = task.completed ? 'fa-solid fa-circle-check text-purple-600' : 'fa-regular fa-circle text-purple-300';
+        const textClass = task.completed ? 'line-through text-purple-300' : 'text-slate-800';
+
+        li.innerHTML = `
+          <div class="flex items-center gap-2 cursor-pointer flex-grow" onclick="toggleTask('monthly', '${selectedModalDateKey}', ${task.id})">
+            <i class="${checkIconClass} text-xl"></i>
+            <span class="${textClass}">${escapeHtml(task.text)}</span>
+          </div>
+          <button onclick="deleteTask('monthly', '${selectedModalDateKey}', ${task.id})" class="text-purple-300 active:text-red-500 px-2 py-1">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        `;
+        ul.appendChild(li);
+      });
+    }
+
+    function addModalTask() {
+      const input = document.getElementById('modal-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (!appData.monthly[selectedModalDateKey]) appData.monthly[selectedModalDateKey] = [];
+      appData.monthly[selectedModalDateKey].push({ id: Date.now(), text, completed: false });
+
+      saveDataSilently();
+      renderModalTasks();
+      renderMonthlyView();
+      input.value = '';
+    }
+
+    // ==========================================
+    // YEARLY VIEW LOGIC
+    // ==========================================
+    function changeYear(delta) {
+      currentDate.setFullYear(currentDate.getFullYear() + delta);
+      renderYearlyView();
+    }
+
+    function renderYearlyView() {
+      const year = currentDate.getFullYear();
+      document.getElementById('yearly-title').innerText = `✨ ${year}년 목표 & 버킷리스트 ✨`;
+
+      const grid = document.getElementById('yearly-grid');
+      grid.innerHTML = '';
+
+      for (let m = 1; m <= 12; m++) {
+        const monthKey = `${year}-${m}`;
+        const goalText = appData.yearly[monthKey] || '';
+
+        const card = document.createElement('div');
+        card.className = "bg-white/95 rounded-2xl p-3.5 shadow-md border-2 border-purple-200 flex flex-col justify-between";
+
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-center mb-2 border-b border-purple-100 pb-1">
+              <h3 class="text-2xl font-bold text-purple-900 font-hand">${m}월 (Month ${m})</h3>
+              <button onclick="jumpToMonth(${year}, ${m})" class="text-xs bg-purple-100 active:bg-purple-200 text-purple-800 px-2.5 py-1 rounded-full font-bold min-h-[30px] flex items-center justify-center">
+                달력보기
+              </button>
+            </div>
+            <textarea 
+              placeholder="${m}월의 주요 목표를 작성하세요..." 
+              onchange="updateYearlyGoal('${monthKey}', this.value)"
+              class="w-full h-20 bg-purple-50/50 border border-purple-100 rounded-xl p-2 text-xl focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none font-hand"
+            >${escapeHtml(goalText)}</textarea>
+          </div>
+        `;
+        grid.appendChild(card);
+      }
+    }
+
+    function updateYearlyGoal(monthKey, text) {
+      appData.yearly[monthKey] = text;
+      saveDataSilently();
+    }
+
+    function jumpToMonth(year, month) {
+      currentDate = new Date(year, month - 1, 1);
+      switchView('monthly');
+    }
+
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+    function toggleTask(view, key, taskId) {
+      const target = view === 'weekly' ? appData.weekly[key] : appData.monthly[key];
+      if (!target) return;
+
+      const task = target.find(t => t.id === taskId);
+      if (task) task.completed = !task.completed;
+
+      saveDataSilently();
+      if (view === 'weekly') renderWeekly();
+      if (view === 'monthly') {
+        renderModalTasks();
+        renderMonthlyView();
+      }
+    }
+
+    function deleteTask(view, key, taskId) {
+      if (view === 'weekly') {
+        appData.weekly[key] = appData.weekly[key].filter(t => t.id !== taskId);
+        renderWeekly();
+      } else {
+        appData.monthly[key] = appData.monthly[key].filter(t => t.id !== taskId);
+        renderModalTasks();
+        renderMonthlyView();
+      }
+      saveDataSilently();
+    }
+
+    function clearAllData() {
+      if (confirm('정말로 모든 플래너 데이터를 초기화하시겠습니까?')) {
+        localStorage.removeItem('mimi_planner_mobile_v1');
+        location.reload();
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
+    // 초기화 및 엔터키 이벤트 바인딩
+    document.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      renderWeekly();
+
+      days.forEach(day => {
+        const input = document.getElementById(`input-${day}`);
+        if (input) {
+          input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTask(day);
+          });
+        }
+      });
+
+      document.getElementById('modal-input')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addModalTask();
+      });
+    });
+  </script>
+</body>
+</html>
